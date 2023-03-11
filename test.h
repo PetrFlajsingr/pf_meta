@@ -2,6 +2,7 @@
 
 namespace pf {
     enum class Hihi;
+    enum class E10;
     enum class [[using pf: operators(()()()((())), [[nodiscard]], 1ll, 1.011, [] {}(), "yeet", 'a', [][][] :: : 3214234... [][][][]),
                  hihi()]] [[pf::operators2(1ll, 1.011, "yeet"), pf::hihi2]] SomeEnum : bool{Value1 [[test, test2]] [[test3]], Value2};
     struct Test {
@@ -27,5 +28,4 @@ namespace pf {
     enum class E7 { A, B, C, D, E };
     enum class E8 { A, B, C, D, E };
     enum class E9 { A, B, C, D, E };
-    enum class E10 { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, Y, Z };
 }// namespace pf

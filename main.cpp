@@ -62,8 +62,7 @@ struct Variable {
     std::string type;
 };
 
-struct MemberVariable : Variable {
-};
+struct MemberVariable : Variable {};
 
 struct Function {
     std::string fullName;
@@ -408,26 +407,9 @@ private:
     }
 };
 
-
-class TypeIdGenerator {
-public:
-    TypeIdGenerator() {
-        std::random_device rd{};
-        std::seed_seq ss{rd(), rd(), rd()};
-        gen = std::mt19937_64{ss};
-    }
-    [[nodiscard]] pf::meta::ID generateTypeId() {
-        const auto w1 = dis(gen);
-        const auto w2 = dis(gen);
-        return pf::meta::ID{w1, w2};
-    }
-
-private:
-    std::mt19937_64 gen;
-    std::uniform_int_distribution<std::uint64_t> dis;
-};
-
-[[nodiscard]] std::string idToString(pf::meta::ID id) { return fmt::format("::pf::meta::ID{{0x{:x}u, 0x{:x}u}}", id.id[0], id.id[1]); }
+[[nodiscard]] std::string createIdInstance(std::string_view id) {
+    return fmt::format(R"fmt(::pf::meta::ID{{"{}", {}ull}})fmt", id, id.size());
+}
 
 constexpr auto StaticEnumTypeInfoTemplate = R"fmt(
 /****************************** {full_name} START ******************************/
@@ -600,7 +582,7 @@ public:
         //std::cout << decl.getNameAsString() << std::endl;
 
         const auto definition = decl.getDefinition();
-        if (definition == nullptr) { return std::nullopt; }
+        if (definition != &decl) { return std::nullopt; }
 
         EnumTypeInfo result{};
         result.fullName = definition->getQualifiedNameAsString();
@@ -648,7 +630,6 @@ public:
             for (auto [name, attributes]: enumAttributes.valueAttributes) { result.values[name].attributes = std::move(attributes); }
         }
         using namespace fmt::literals;
-        TypeIdGenerator gen{};
 
         const auto stringifyAttributes = [](const std::vector<Attribute> &attrs) {
             std::string result{};
@@ -665,37 +646,37 @@ public:
             return result;
         };
 
-        const auto typeId = gen.generateTypeId();
+        const auto typeId = result.fullName;
 
 
         std::unordered_map<std::string, std::string> valueIds{};
         std::string valueIdsStr{};
         for (const auto &[name, info]: result.values) {
-            const auto valueId = gen.generateTypeId();
-            const auto valueIdStr = idToString(valueId);
             const auto fullName = fmt::format("{}::{}", result.fullName, name);
+            const auto valueId = fullName;
+            const auto valueIdStr = createIdInstance(valueId);
             valueIds.emplace(fullName, valueIdStr);
             valueIdsStr.append(valueIdStr);
             valueIdsStr.append(", ");
 
             const auto valueStr = std::visit([](auto val) { return fmt::format("{}", val); }, info.value);
 
-            *outStream << fmt::format(StaticEnumValueInfoTemplate, "type"_a = result.fullName, "value_id"_a = idToString(valueId),
+            *outStream << fmt::format(StaticEnumValueInfoTemplate, "type"_a = result.fullName, "value_id"_a = valueIdStr,
                                       "source_line"_a = result.sourceLocation.line, "source_column"_a = result.sourceLocation.column,
-                                      "type_id"_a = idToString(typeId), "attributes"_a = stringifyAttributes(info.attributes),
+                                      "type_id"_a = createIdInstance(typeId), "attributes"_a = stringifyAttributes(info.attributes),
                                       "name"_a = name, "full_name"_a = fullName, "underlying_type"_a = result.underlyingType,
                                       "underlying_value"_a = valueStr, "value"_a = fullName);
         }
         if (!valueIdsStr.empty()) { valueIdsStr = valueIdsStr.substr(0, valueIdsStr.length() - 2); }
 
-        const auto const_type_id = idToString(gen.generateTypeId());
-        const auto lref_type_id = idToString(gen.generateTypeId());
-        const auto const_lref_type_id = idToString(gen.generateTypeId());
-        const auto rref_type_id = idToString(gen.generateTypeId());
-        const auto ptr_type_id = idToString(gen.generateTypeId());
-        const auto const_ptr_type_id = idToString(gen.generateTypeId());
+        const auto const_type_id = createIdInstance(fmt::format("const {}", result.fullName));
+        const auto lref_type_id = createIdInstance(fmt::format("{}&", result.fullName));
+        const auto const_lref_type_id = createIdInstance(fmt::format("const {}&", result.fullName));
+        const auto rref_type_id = createIdInstance(fmt::format("{}&&", result.fullName));
+        const auto ptr_type_id = createIdInstance(fmt::format("{}*", result.fullName));
+        const auto const_ptr_type_id = createIdInstance(fmt::format("const {}*", result.fullName));
 
-        *outStream << fmt::format(StaticEnumTypeInfoTemplate, "type_id"_a = idToString(typeId), "type"_a = result.fullName,
+        *outStream << fmt::format(StaticEnumTypeInfoTemplate, "type_id"_a = createIdInstance(typeId), "type"_a = result.fullName,
                                   "source_line"_a = result.sourceLocation.line, "source_column"_a = result.sourceLocation.column,
                                   "attributes"_a = stringifyAttributes(result.attributes), "name"_a = result.name,
                                   "full_name"_a = result.fullName, "underlying_type"_a = result.underlyingType,
@@ -704,10 +685,10 @@ public:
                                   "ptr_type_id"_a = ptr_type_id, "const_ptr_type_id"_a = const_ptr_type_id);
 
         *outStream << "namespace pf::meta::details {";
-        *outStream << fmt::format(GetTypeIDTemplate, "full_name"_a = result.fullName, "type"_a = result.fullName,
-                                  "type_id"_a = idToString(typeId), "const_type_id"_a = const_type_id, "lref_type_id"_a = lref_type_id,
-                                  "const_lref_type_id"_a = const_lref_type_id, "rref_type_id"_a = rref_type_id,
-                                  "ptr_type_id"_a = ptr_type_id, "const_ptr_type_id"_a = const_ptr_type_id);
+        *outStream << fmt::format(
+                GetTypeIDTemplate, "full_name"_a = result.fullName, "type"_a = result.fullName, "type_id"_a = createIdInstance(typeId),
+                "const_type_id"_a = const_type_id, "lref_type_id"_a = lref_type_id, "const_lref_type_id"_a = const_lref_type_id,
+                "rref_type_id"_a = rref_type_id, "ptr_type_id"_a = ptr_type_id, "const_ptr_type_id"_a = const_ptr_type_id);
         for (const auto &[name, id]: valueIds) {
             *outStream << fmt::format(GetConstantIDTemplate, "full_name"_a = fmt::format("{}::{}", result.fullName, name),
                                       "constant"_a = name, "value_id"_a = id);

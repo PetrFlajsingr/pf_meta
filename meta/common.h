@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <pf_common/containers/StringLiteral.h>
+#include <pf_common/concepts/specializations.h>
 #include <string_view>
 
 #if !defined(PF_META_MAX_ATTRIBUTE_ARG_COUNT)
@@ -90,14 +91,26 @@ namespace pf::meta {
     };
 
     struct ID {
-        constexpr ID() : ID{0x0u, 0x0u} {}
-        constexpr explicit ID(const std::array<std::uint64_t, 2> &data) : id{data} {}
+        constexpr ID() : ID{"", 0} {}
+        constexpr explicit ID(const char* idStr, std::size_t s) : size{s} {
+            for (auto i = 0ull; i < size; ++i) {
+                data[i] = idStr[i];
+            }
+        }
 
-        constexpr ID(std::uint64_t w1, std::uint64_t w2) : id{w1, w2} {}
+        [[nodiscard]] constexpr bool isValid() const { return size != 0ull; }
+        [[nodiscard]] constexpr bool operator==(const ID &other) const noexcept  {
+            if (size != other.size) { return false; }
+            for (auto i1 = data, i2 = other.data; i1 != (data + size); ++i1, ++i2) {
+                if (*i1 != *i2) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
-        [[nodiscard]] constexpr bool isValid() const { return id[0] == 0x0u && id[1] == 0x0u; }
-        [[nodiscard]] constexpr bool operator==(const ID &other) const noexcept = default;
-        std::array<std::uint64_t, 2> id;
+        char data[1024]{};
+        std::size_t size{};
     };
 
     namespace details {
